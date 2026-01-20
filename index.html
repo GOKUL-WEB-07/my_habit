@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>My Habit</title>
 
   <!-- Fonts -->
@@ -11,21 +11,28 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <main id="app">
+
+<main id="app">
+
+  <!-- ======================
+       HOME SCREEN
+  ======================= -->
+  <section id="homeScreen" class="screen active">
+
     <!-- TOP BAR -->
     <header class="topbar">
       <div class="brand">
         <h1>My Habit</h1>
         <p class="subtitle">Small steps. Big wins.</p>
       </div>
-      <div class="date-chip" id="dateChip">Mon, Jan 1</div>
+      <div class="date-chip" id="dateChip"></div>
     </header>
 
-    <!-- TAB + STATS -->
+    <!-- CONTROLS -->
     <section class="controls">
-      <div class="tabs" role="tablist">
-        <button class="tab active" data-tab="all" id="tabAll">All</button>
-        <button class="tab" data-tab="done" id="tabDone">Completed</button>
+      <div class="tabs">
+        <button id="tabAll" class="tab active">All</button>
+        <button id="tabDone" class="tab">Completed</button>
       </div>
 
       <div class="stats">
@@ -44,67 +51,131 @@
       </div>
     </section>
 
-    <!-- LIST -->
+    <!-- HABIT LIST -->
     <section class="listwrap">
-      <ul id="list" class="list" aria-live="polite"></ul>
+      <ul id="list" class="list"></ul>
       <div id="empty" class="empty">No habits yet — add your first one ✨</div>
     </section>
 
-    <!-- Floating add button -->
+    <!-- FAB -->
     <button id="fab" class="fab" aria-label="Add habit">＋</button>
 
-    <!-- FORM MODAL (create / edit) -->
-    <div id="modal" class="modal" aria-hidden="true">
-      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-        <div class="modal-header">
-          <h3 id="modalTitle">Create Habit</h3>
-          <button class="icon-btn" id="closeModal" title="Close">✕</button>
+  </section>
+
+  <!-- ======================
+       CREATE / EDIT MODAL
+  ======================= -->
+  <div id="modal" class="modal" aria-hidden="true">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modalTitle">Create Habit</h3>
+        <button id="closeModal" class="icon-btn">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <label class="field">
+          <span>Name</span>
+          <input id="inputName" type="text" placeholder="e.g. Drink water">
+        </label>
+
+        <label class="field">
+          <span>Note (optional)</span>
+          <input id="inputNote" type="text" placeholder="e.g. 2–3 bottles">
+        </label>
+
+        <label class="field">
+          <span>Color</span>
+          <div id="colorList" class="color-list"></div>
+        </label>
+
+        <div class="modal-actions">
+          <button id="saveBtn" class="btn primary">Save</button>
+          <button id="cancelBtn" class="btn">Cancel</button>
+          <button id="deleteBtn" class="btn danger hidden">Delete</button>
         </div>
 
-        <div class="modal-body">
-          <label class="field">
-            <span>Name</span>
-            <input id="inputName" type="text" placeholder="eg. Drink water" maxlength="60">
-          </label>
+        <!-- NEW -->
+        <button id="viewProgressBtn" class="btn ghost hidden">
+          View Progress →
+        </button>
 
-          <label class="field">
-            <span>Note (optional)</span>
-            <input id="inputNote" type="text" placeholder="eg. 2–3 bottles" maxlength="120">
-          </label>
-
-          <label class="field">
-            <span>Color</span>
-            <div id="colorList" class="color-list" role="radiogroup" aria-label="Choose color"></div>
-          </label>
-
-          <div class="modal-actions">
-            <button id="saveBtn" class="btn primary">Save</button>
-            <button id="cancelBtn" class="btn">Cancel</button>
-            <button id="deleteBtn" class="btn danger hidden">Delete</button>
-          </div>
-        </div>
       </div>
     </div>
+  </div>
 
-    <!-- Confirm delete -->
-    <div id="confirm" class="confirm hidden" aria-hidden="true">
-      <div class="confirm-card">
-        <h4>Delete habit?</h4>
-        <p>This action permanently deletes the habit.</p>
-        <div class="confirm-actions">
-          <button id="confirmYes" class="btn danger">Yes, delete</button>
-          <button id="confirmNo" class="btn">Cancel</button>
-        </div>
+  <!-- ======================
+       PROGRESS SCREEN (NEW PAGE)
+  ======================= -->
+  <section id="progressScreen" class="screen">
+
+    <!-- HEADER -->
+    <header class="topbar">
+      <button id="backToHome" class="icon-btn">←</button>
+      <div class="brand">
+        <h1 id="progressHabitName">Habit</h1>
+        <p class="subtitle" id="progressHabitNote"></p>
+      </div>
+    </header>
+
+    <!-- ANALYTICS -->
+    <section class="stats">
+      <div class="stat">
+        <span class="stat-label">Consistency</span>
+        <span class="stat-value" id="statConsistency">0%</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Current Streak</span>
+        <span class="stat-value" id="statStreak">0</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Best Streak</span>
+        <span class="stat-value" id="statBestStreak">0</span>
+      </div>
+    </section>
+
+    <!-- CALENDAR -->
+    <section id="calendarView" class="calendar-wrap">
+      <div class="calendar-header">
+        <button id="prevMonth" class="icon-btn">‹</button>
+        <h3 id="calendarMonth">January 2026</h3>
+        <button id="nextMonth" class="icon-btn">›</button>
+      </div>
+
+      <div id="calendarGrid" class="calendar-grid">
+        <!-- days injected by JS -->
+      </div>
+
+     
+    </section>
+
+  </section>
+
+  <!-- CONFIRM DELETE -->
+  <div id="confirm" class="confirm hidden">
+    <div class="confirm-card">
+      <h4>Delete habit?</h4>
+      <p>This action cannot be undone.</p>
+      <div class="confirm-actions">
+        <button id="confirmYes" class="btn danger">Delete</button>
+        <button id="confirmNo" class="btn">Cancel</button>
       </div>
     </div>
+  </div>
 
   
 
 
-    <!-- small toast -->
-    <div id="toast" class="toast hidden"></div>
-  </main>
+  
 
-  <script src="main.js"></script>
+
+  <!-- TOAST -->
+  <div id="toast" class="toast hidden"></div>
+
+</main>
+
+
+<script src="main.js"></script>
+<script src="calendar.js"></script>
+
 </body>
 </html>

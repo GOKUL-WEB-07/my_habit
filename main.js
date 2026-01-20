@@ -1,288 +1,430 @@
-/* ===========================
-   My Habit - main.js
-   OPTION 1 IMPLEMENTED (DATE-BASED COMPLETION)
-   =========================== */
+/* ======================================================
+   MY HABIT 2.0 – main.js
+   Core Logic + Calendar + History + Reset
+====================================================== */
 
-/* ------------ Helpers ------------ */
-const UID = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
-const todayKey = () => new Date().toISOString().slice(0,10); // YYYY-MM-DD
-const lsKey = "myhabit_tasks_v2";
+/* =====================
+   HELPERS
+===================== */
+function getTodayKey() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`; // LOCAL YYYY-MM-DD
+}
 
-/* ------------ DOM ------------ */
+getTodayKey();
+
+const uid = () =>
+  Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+const todayKey = () => new Date().toISOString().slice(0, 10);
+const STORAGE_KEY = "my_habit_v2";
+
+/* =====================
+   STATE
+===================== */
+
+let habits = [];
+let activeTab = "all";
+let editingId = null;
+let selectedColor = null;
+
+/* =====================
+   DOM
+===================== */
+
 const listEl = document.getElementById("list");
 const emptyEl = document.getElementById("empty");
+
 const fab = document.getElementById("fab");
+
 const modal = document.getElementById("modal");
 const modalTitle = document.getElementById("modalTitle");
 const inputName = document.getElementById("inputName");
 const inputNote = document.getElementById("inputNote");
-const colorListEl = document.getElementById("colorList");
+const colorList = document.getElementById("colorList");
+
 const saveBtn = document.getElementById("saveBtn");
 const cancelBtn = document.getElementById("cancelBtn");
 const closeModalBtn = document.getElementById("closeModal");
 const deleteBtn = document.getElementById("deleteBtn");
-const confirm = document.getElementById("confirm");
-const confirmYes = document.getElementById("confirmYes");
-const confirmNo = document.getElementById("confirmNo");
-const toastEl = document.getElementById("toast");
 
 const tabAll = document.getElementById("tabAll");
 const tabDone = document.getElementById("tabDone");
-const dateChip = document.getElementById("dateChip");
+
 const statTotal = document.getElementById("statTotal");
 const statToday = document.getElementById("statToday");
 const statPercent = document.getElementById("statPercent");
+const dateChip = document.getElementById("dateChip");
 
-/* ------------ State ------------ */
-let tasks = [];
-let editingId = null;
-let activeTab = "all";
+const toast = document.getElementById("toast");
 
-/* ------------ Colors ------------ */
-const COLORS = [
-  "#7A8450", "#CFD522", "#2071BD",
-  "#DD1E90", "#332AB1", "#5FB7FF", "#8AFFC1"
-];
+const closeCalendarBtn = document.getElementById("closeCalendarBtn");
+const calendarView = document.getElementById("calendarView");
 
-/* ------------ Storage ------------ */
-function load(){
-  const raw = localStorage.getItem(lsKey);
-  tasks = raw ? JSON.parse(raw) : [];
 
-  // backward safety
-  tasks.forEach(t => {
-    if (!t.completedDates) t.completedDates = {};
-  });
+const homeScreen = document.getElementById("homeScreen");
+const progressScreen = document.getElementById("progressScreen");
+const backToHomeBtn = document.getElementById("backToHome");
+
+function closeProgressScreen() {
+  progressScreen.classList.remove("active");
+  homeScreen.classList.add("active");
 }
 
-function save(){
-  localStorage.setItem(lsKey, JSON.stringify(tasks));
+if (closeCalendarBtn) {
+  closeCalendarBtn.addEventListener("click", closeProgressScreen);
+}
+
+if (backToHomeBtn) {
+  backToHomeBtn.addEventListener("click", closeProgressScreen);
+}
+
+
+function closeCalendar() {
+  if (!calendarView) return;
+  calendarView.classList.add("hidden");
+}
+
+if (closeCalendarBtn) {
+  closeCalendarBtn.addEventListener("click", closeCalendar);
+}
+
+
+/* =====================
+   COLORS
+===================== */
+
+const COLORS = [
+  "#7A8450",
+  "#CFD522",
+  "#2071BD",
+  "#DD1E90",
+  "#332AB1",
+  "#5FB7FF",
+  "#8AFFC1"
+];
+
+/* =====================
+   STORAGE
+===================== */
+
+function load() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  habits = raw ? JSON.parse(raw) : [];
+}
+
+function save() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(habits));
   render();
 }
 
-/* ------------ Date UI ------------ */
-function uiDate(){
+/* =====================
+   DATE + RESET
+===================== */
+
+function updateDate() {
   const d = new Date();
   dateChip.textContent = d.toLocaleDateString(undefined, {
-    weekday:'short', month:'short', day:'numeric'
+    weekday: "short",
+    month: "short",
+    day: "numeric"
   });
 }
 
-/* ------------ Color Picker ------------ */
-function renderColorChoices(selected){
-  colorListEl.innerHTML = "";
-  COLORS.forEach(c => {
-    const btn = document.createElement("button");
-    btn.className = "color-dot";
-    btn.style.background = c;
-    if(c === selected) btn.classList.add("selected");
-    btn.onclick = () => {
-      [...colorListEl.children].forEach(x=>x.classList.remove("selected"));
-      btn.classList.add("selected");
-    };
-    colorListEl.appendChild(btn);
-  });
-}
-
-function selectedColor(){
-  const sel = colorListEl.querySelector(".color-dot.selected");
-  return sel ? sel.style.background : COLORS[0];
-}
-
-/* ------------ Completion Helpers ------------ */
-function isCompletedToday(task){
-  return task.completedDates?.[todayKey()] === true;
-}
-
-/* ------------ Render ------------ */
-function render(){
-  listEl.innerHTML = "";
-
-  const total = tasks.length;
-  const doneToday = tasks.filter(isCompletedToday).length;
-
-  statTotal.textContent = total;
-  statToday.textContent = doneToday;
-  statPercent.textContent = total === 0 ? "0%" : Math.round((doneToday/total)*100) + "%";
-
-  let visible;
-  if(activeTab === "all"){
-    const active = tasks.filter(t => !isCompletedToday(t));
-    const done = tasks.filter(isCompletedToday);
-    visible = [...active, ...done];
-  } else {
-    visible = tasks.filter(isCompletedToday);
-  }
-
-  emptyEl.style.display = visible.length === 0 ? "block" : "none";
-
-  visible.forEach(task => {
-    const li = document.createElement("li");
-    li.className = "item";
-    li.style.setProperty("--c", task.color);
-
-    if(isCompletedToday(task)) li.classList.add("done");
-
-    li.innerHTML = `
-      <div class="content">
-        <h4>${escapeHtml(task.name)}</h4>
-        <p>${escapeHtml(task.note || "—")}</p>
-      </div>
-      <div class="circle ${isCompletedToday(task) ? "done" : ""}">
-        <span class="tick">✔</span>
-      </div>
-    `;
-
-    li.onclick = e => {
-      if(e.target.closest(".circle")) return;
-      openEditModal(task.id);
-    };
-
-    li.querySelector(".circle").onclick = e => {
-      e.stopPropagation();
-      toggleComplete(task, li);
-    };
-
-    listEl.appendChild(li);
-  });
-}
-
-/* ------------ Toggle Complete (OPTION 1 CORE) ------------ */
-function toggleComplete(task, li){
+function dailyResetIfNeeded() {
   const today = todayKey();
 
-  if(isCompletedToday(task)){
-    delete task.completedDates[today];
-    li.classList.remove("done");
-    showToast(`Marked "${task.name}" incomplete`);
-    save();
-  } else {
-    task.completedDates[today] = true;
-    li.classList.add("done","fly-down");
+  habits.forEach(h => {
+    if (!h.history) h.history = {};
+    if (!(today in h.history)) {
+      h.history[today] = false;
+    }
+  });
 
-    setTimeout(()=>{
-      tasks = tasks.filter(t=>t.id!==task.id);
-      tasks.push(task);
-      save();
-    },300);
-
-    showToast(`Nice — "${task.name}" done today`);
-  }
+  save();
 }
 
-/* ------------ Modal ------------ */
-function openCreateModal(){
+/* =====================
+   COLOR PICKER
+===================== */
+
+function renderColors(selected) {
+  colorList.innerHTML = "";
+  COLORS.forEach(c => {
+    const dot = document.createElement("div");
+    dot.className = "color-dot";
+    dot.style.background = c;
+    if (c === selected) dot.classList.add("selected");
+    dot.onclick = () => {
+      selectedColor = c;
+      renderColors(c);
+    };
+    colorList.appendChild(dot);
+  });
+}
+
+/* =====================
+   MODAL
+===================== */
+
+function openCreateModal() {
   editingId = null;
   modalTitle.textContent = "Create Habit";
   inputName.value = "";
   inputNote.value = "";
+  selectedColor = COLORS[0];
   deleteBtn.classList.add("hidden");
-  renderColorChoices(COLORS[0]);
-  modal.style.display = "grid";
+  renderColors(selectedColor);
+  modal.setAttribute("aria-hidden", "false");
 }
 
-function openEditModal(id){
-  const task = tasks.find(t=>t.id===id);
-  if(!task) return;
+function openEditModal(id) {
+  const h = habits.find(x => x.id === id);
+  if (!h) return;
+
   editingId = id;
   modalTitle.textContent = "Edit Habit";
-  inputName.value = task.name;
-  inputNote.value = task.note || "";
+
+  inputName.value = h.name;
+  inputNote.value = h.note || "";
+  selectedColor = h.color;
+
   deleteBtn.classList.remove("hidden");
-  renderColorChoices(task.color);
-  modal.style.display = "grid";
+
+  // ✅ Progress button logic
+  const progressBtn = document.getElementById("viewProgressBtn");
+  progressBtn.classList.remove("hidden");
+
+  progressBtn.onclick = () => {
+    closeModal();
+    openHabitCalendar(h); // 🔥 this must receive habit OBJECT
+  };
+
+  renderColors(selectedColor);
+  modal.setAttribute("aria-hidden", "false");
 }
 
-function closeModal(){
-  modal.style.display = "none";
+function openCreateModal() {
+  editingId = null;
+
+  modalTitle.textContent = "Create Habit";
+  inputName.value = "";
+  inputNote.value = "";
+
+  selectedColor = COLORS[0];
+  deleteBtn.classList.add("hidden");
+
+  const progressBtn = document.getElementById("viewProgressBtn");
+  progressBtn.classList.add("hidden"); // ✅ hide here
+
+  renderColors(selectedColor);
+  modal.setAttribute("aria-hidden", "false");
+}
+
+
+
+// Example button (you already planned "Progress")
+
+
+
+function closeModal() {
+  modal.setAttribute("aria-hidden", "true");
   editingId = null;
 }
 
-/* ------------ Save ------------ */
-function saveFromModal(){
+/* =====================
+   SAVE / DELETE
+===================== */
+
+function saveHabit() {
   const name = inputName.value.trim();
-  if(!name){ showToast("Give your habit a name"); return; }
+  if (!name) return showToast("Habit name required");
 
-  const note = inputNote.value.trim();
-  const color = selectedColor();
-
-  if(editingId){
-    const t = tasks.find(x=>x.id===editingId);
-    t.name = name;
-    t.note = note;
-    t.color = color;
+  if (editingId) {
+    const h = habits.find(x => x.id === editingId);
+    h.name = name;
+    h.note = inputNote.value;
+    h.color = selectedColor;
     showToast("Habit updated");
   } else {
-    tasks.unshift({
-      id: UID(),
-      name, note, color,
-      createdAt: new Date().toISOString(),
-      completedDates: {}
+    habits.unshift({
+      id: uid(),
+      name,
+      note: inputNote.value,
+      color: selectedColor,
+      createdAt: todayKey(),
+      history: { [todayKey()]: false }
     });
-    showToast("Habit added");
+    showToast("Habit created");
   }
+
   save();
   closeModal();
 }
 
-/* ------------ Delete ------------ */
-let pendingDeleteId = null;
-function askDelete(){
-  pendingDeleteId = editingId;
-  confirm.classList.remove("hidden");
-}
-function cancelDelete(){
-  confirm.classList.add("hidden");
-  pendingDeleteId = null;
-}
-function confirmDelete(){
-  tasks = tasks.filter(t=>t.id!==pendingDeleteId);
+function deleteHabit() {
+  if (!editingId) return;
+  habits = habits.filter(h => h.id !== editingId);
+  save();
+  closeModal();
   showToast("Habit deleted");
-  save();
-  cancelDelete();
-  closeModal();
 }
 
-/* ------------ Tabs ------------ */
-function setTab(tab){
-  activeTab = tab;
-  tabAll.classList.toggle("active", tab==="all");
-  tabDone.classList.toggle("active", tab==="done");
+/* =====================
+   COMPLETE TOGGLE
+===================== */
+
+function toggleComplete(habit) {
+  const today = todayKey();
+  habit.history[today] = !habit.history[today];
+  save();
+}
+
+/* =====================
+   STREAK
+===================== */
+
+function calculateStreak(history) {
+  let streak = 0;
+  let d = new Date();
+
+  while (true) {
+    const key = d.toISOString().slice(0, 10);
+    if (history[key]) {
+      streak++;
+      d.setDate(d.getDate() - 1);
+    } else break;
+  }
+  return streak;
+}
+
+/* =====================
+   RENDER
+===================== */
+
+function render() {
+  listEl.innerHTML = "";
+
+  const today = todayKey();
+  let doneToday = 0;
+
+  let visible = habits.filter(h =>
+    activeTab === "done" ? h.history[today] : true
+  );
+
+  if (!visible.length) {
+    emptyEl.style.display = "block";
+  } else {
+    emptyEl.style.display = "none";
+  }
+
+  visible.forEach(h => {
+    const li = document.createElement("li");
+    li.className = "item";
+    li.style.setProperty("--c", h.color);
+
+    if (h.history[today]) li.classList.add("done");
+
+    li.innerHTML = `
+      <div class="content">
+        <h4>${h.name}</h4>
+        <p>${h.note || "—"}</p>
+      </div>
+      <div class="circle ${h.history[today] ? "done" : ""}">
+        <span class="tick">✔</span>
+      </div>
+    `;
+
+    li.onclick = () => openEditModal(h.id);
+
+    li.querySelector(".circle").onclick = e => {
+      e.stopPropagation();
+      toggleComplete(h);
+    };
+
+    listEl.appendChild(li);
+
+    if (h.history[today]) doneToday++;
+  });
+
+  statTotal.textContent = habits.length;
+  statToday.textContent = doneToday;
+  statPercent.textContent =
+    habits.length === 0
+      ? "0%"
+      : Math.round((doneToday / habits.length) * 100) + "%";
+}
+
+/* =====================
+   TOAST
+===================== */
+
+let toastTimer;
+function showToast(msg) {
+  toast.textContent = msg;
+  toast.classList.remove("hidden");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.add("hidden"), 1600);
+}
+
+/* =====================
+   EVENTS
+===================== */
+
+fab.onclick = openCreateModal;
+saveBtn.onclick = saveHabit;
+cancelBtn.onclick = closeModal;
+closeModalBtn.onclick = closeModal;
+deleteBtn.onclick = deleteHabit;
+
+tabAll.onclick = () => {
+  activeTab = "all";
+  tabAll.classList.add("active");
+  tabDone.classList.remove("active");
+  render();
+};
+
+tabDone.onclick = () => {
+  activeTab = "done";
+  tabDone.classList.add("active");
+  tabAll.classList.remove("active");
+  render();
+};
+
+document.addEventListener("DOMContentLoaded", () => {
+  const closeCalendarBtn = document.getElementById("closeCalendarBtn");
+  const calendarView = document.getElementById("calendarView");
+
+  if (!closeCalendarBtn) {
+    console.error("❌ closeCalendarBtn not found");
+    return;
+  }
+
+  if (!calendarView) {
+    console.error("❌ calendarView not found");
+    return;
+  }
+
+  closeCalendarBtn.addEventListener("click", () => {
+    calendarView.style.display = "none";
+  });
+});
+
+
+
+/* =====================
+   BOOT
+===================== */
+
+function init() {
+  load();
+  updateDate();
+  dailyResetIfNeeded();
+  renderColors(COLORS[0]);
   render();
 }
 
-/* ------------ Toast ------------ */
-let toastTimer=null;
-function showToast(msg,ms=1800){
-  toastEl.textContent = msg;
-  toastEl.classList.remove("hidden");
-  clearTimeout(toastTimer);
-  toastTimer=setTimeout(()=>toastEl.classList.add("hidden"),ms);
-}
-
-/* ------------ Utils ------------ */
-function escapeHtml(s){
-  return String(s||"").replace(/[&<>"']/g,m=>({
-    "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"
-  }[m]));
-}
-
-/* ------------ Events ------------ */
-fab.onclick = openCreateModal;
-closeModalBtn.onclick = closeModal;
-cancelBtn.onclick = closeModal;
-saveBtn.onclick = saveFromModal;
-deleteBtn.onclick = askDelete;
-confirmYes.onclick = confirmDelete;
-confirmNo.onclick = cancelDelete;
-tabAll.onclick = ()=>setTab("all");
-tabDone.onclick = ()=>setTab("done");
-
-/* ------------ Start ------------ */
-function bootstrap(){
-  load();
-  uiDate();
-  renderColorChoices(COLORS[0]);
-  setTab("all");
-}
-bootstrap();
+init();
